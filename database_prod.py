@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 class DatabaseManager:
     """Production database manager with connection pooling and error handling."""
 
-    def __init__(self, db_path: str = "assistant_demo.db", max_connections: int = 10):
+    def __init__(self, db_path: str = "assistant_core.db", max_connections: int = 10):
         self.db_path = db_path
         self.max_connections = max_connections
         self._connection_pool = []

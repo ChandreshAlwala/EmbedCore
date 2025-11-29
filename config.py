@@ -5,7 +5,7 @@ class Config:
     """Production configuration settings."""
     
     # Database settings
-    DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///assistant_demo.db")
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///assistant_core.db")
     DATABASE_POOL_SIZE: int = int(os.getenv("DATABASE_POOL_SIZE", "10"))
     DATABASE_MAX_OVERFLOW: int = int(os.getenv("DATABASE_MAX_OVERFLOW", "20"))
     

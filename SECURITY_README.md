@@ -50,6 +50,27 @@ Securely manages user encryption keys using Fernet symmetric encryption:
 - Updates storage securely
 - Production-ready with proper error handling and logging
 
+### 3. Embedding Logger v3 ([embed_logger.py](file:///c:/Users/Acer%20Aspire%203/Downloads/secure_Embeddings-main/secure_Embeddings-main/embed_logger.py)) - NEW (Day-2)
+
+Provides comprehensive logging capabilities for embedding operations:
+
+#### `save_embedding(user_id, session_id, embedding_data, platform)`
+- Saves embedding data to SQLite database ([assistant_core.db](file:///c:/Users/Acer%20Aspire%203/Downloads/secure_Embeddings-main/secure_Embeddings-main/assistant_core.db))
+- Uses context managers for safe database operations
+- Includes full input validation and error handling
+
+#### `log_to_db(user_id, session_id, platform, obf_embedding)`
+- Logs embedding data to database with error recovery
+- Never breaks the main system
+
+#### `log_to_csv(user_id, session_id, platform, obf_embedding)`
+- Logs embedding data to CSV file ([embedding_log.csv](file:///c:/Users/Acer%20Aspire%203/Downloads/secure_Embeddings-main/secure_Embeddings-main/embedding_log.csv))
+- Uses CSV writer with proper formatting
+
+#### `log_embedding(...)`
+- Unified wrapper that calls both DB and CSV logging
+- Ensures system stability even if one logging method fails
+
 ## Security Features
 
 1. **Deterministic Embeddings**: Same text always produces the same embedding
@@ -60,12 +81,15 @@ Securely manages user encryption keys using Fernet symmetric encryption:
 6. **Input Validation**: All functions validate inputs to prevent errors
 7. **Error Handling**: Comprehensive error handling with meaningful messages
 8. **Logging**: Detailed logging for monitoring and debugging
+9. **Dual Logging**: Data is logged to both database and CSV for redundancy
 
 ## Usage Examples
 
 ```python
+# Basic embedding workflow
 from embedcore_v3 import generate_embedding, obfuscate, deobfuscate
 from keystore import generate_key, get_key
+from embed_logger import log_embedding
 
 # Generate a secure key for a user
 user_key_bytes = generate_key("user123")
@@ -76,6 +100,9 @@ embedding = generate_embedding("Hello, world!")
 
 # Obfuscate it
 obf_embedding = obfuscate(embedding, user_key)
+
+# Log the embedding (Day-2 feature)
+log_result = log_embedding("user123", "session456", "web_app", obf_embedding)
 
 # De-obfuscate it
 restored_embedding = deobfuscate(obf_embedding, user_key)
@@ -94,12 +121,15 @@ python keystore.py
 python test_embedcore_v3.py
 python test_integration.py
 python demonstration.py
+python day2_demo.py
 ```
 
 The dedicated test suite ([test_embedcore_v3.py](file:///c:/Users/Acer%20Aspire%203/Downloads/secure_Embeddings-main/secure_Embeddings-main/test_embedcore_v3.py)) includes specific tests for:
 - Obfuscation reversibility (the critical requirement)
 - Embedding determinism
 - Full roundtrip process
+- Input consistency
+- Different key behavior
 
 ## Dependencies
 
@@ -123,3 +153,5 @@ For production deployment, consider the following:
 4. **Error Handling**: All functions include proper error handling for robust operation.
 
 5. **Scalability**: For high-volume applications, consider using a more robust database solution.
+
+6. **Log Rotation**: Implement log rotation for the CSV files to prevent them from growing too large.

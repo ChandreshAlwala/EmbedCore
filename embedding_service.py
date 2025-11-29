@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 class EmbeddingService:
     """Service for handling embeddings and similarity search - Chandresh's core work."""
     
-    def __init__(self, db_path: str = "assistant_demo.db", model_name: Optional[str] = None):
+    def __init__(self, db_path: str = "assistant_core.db", model_name: Optional[str] = None):
         self.db_path = db_path
         # Use config model name if not provided
         self.model_name = model_name or config.MODEL_NAME

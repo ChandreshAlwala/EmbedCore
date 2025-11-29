@@ -3,7 +3,7 @@ import json
 from datetime import datetime
 from typing import Optional
 
-def init_database(db_path: str = "assistant_demo.db"):
+def init_database(db_path: str = "assistant_core.db"):
     """Initialize the SQLite database with required tables for Chandresh's work."""
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()

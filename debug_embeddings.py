@@ -1,80 +1,101 @@
-import sys
-import os
-sys.path.append(os.path.join(os.path.dirname(__file__)))
+#!/usr/bin/env python3
+"""
+Debug Embeddings Utility
 
-from embedding_service import embedding_service
+This script helps debug the embedding generation process.
+"""
+
 import json
+from embedcore_v3 import generate_embedding, obfuscate, deobfuscate
 
-def debug_embedding_generation():
+def debug_embedding_generation(text: str, key: str = "debug_key"):
     """Debug the embedding generation process."""
-    print("Debugging embedding generation...")
+    print(f"Debugging embedding generation for: '{text}'")
+    print("=" * 50)
     
-    # Test texts
-    test_texts = [
-        "This is a test summary for embedding storage",
-        "Another example text for testing embeddings",
-        "The quick brown fox jumps over the lazy dog",
-        "Machine learning is a subset of artificial intelligence",
-        "Natural language processing helps computers understand human language"
-    ]
-    
-    for i, text in enumerate(test_texts):
-        print(f"\n--- Test {i+1}: '{text}' ---")
-        
+    try:
         # Generate embedding
-        embedding = embedding_service.generate_embedding(text)
+        print("1. Generating embedding...")
+        embedding = generate_embedding(text)
+        print(f"   ✓ Generated embedding with {len(embedding)} dimensions")
+        print(f"   First 5 values: {embedding[:5]}")
+        
+        # Obfuscate embedding
+        print("\n2. Obfuscating embedding...")
+        obfuscated = obfuscate(embedding, key)
+        print(f"   ✓ Obfuscated embedding with {len(obfuscated)} dimensions")
+        print(f"   First 5 values: {obfuscated[:5]}")
+        
+        # Deobfuscate embedding
+        print("\n3. Deobfuscating embedding...")
+        deobfuscated = deobfuscate(obfuscated, key)
+        print(f"   ✓ Deobfuscated embedding with {len(deobfuscated)} dimensions")
+        
+        # Verify reversibility
+        print("\n4. Verifying reversibility...")
+        is_reversible = True
+        for i in range(len(embedding)):
+            if abs(embedding[i] - deobfuscated[i]) > 1e-10:
+                print(f"   ❌ Mismatch at index {i}: {embedding[i]} vs {deobfuscated[i]}")
+                is_reversible = False
+                break
+        
+        if is_reversible:
+            print("   ✓ Obfuscation is perfectly reversible")
         
         # Show statistics
-        non_zero_count = sum(1 for val in embedding if val != 0.0)
-        zero_count = len(embedding) - non_zero_count
-        zero_percentage = (zero_count / len(embedding)) * 100
+        print("\n5. Embedding statistics:")
+        print(f"   Min value: {min(embedding)}")
+        print(f"   Max value: {max(embedding)}")
+        print(f"   Mean value: {sum(embedding) / len(embedding)}")
         
-        print(f"Embedding dimension: {len(embedding)}")
-        print(f"Non-zero values: {non_zero_count}")
-        print(f"Zero values: {zero_count} ({zero_percentage:.1f}%)")
+        print("\n✓ Debug completed successfully")
+        return True
         
-        # Show first 10 values
-        print(f"First 10 values: {[round(val, 4) for val in embedding[:10]]}")
-        
-        # Check if all values are zero
-        if non_zero_count == 0:
-            print("WARNING: All values are zero!")
-        elif non_zero_count < 10:
-            print("WARNING: Very few non-zero values!")
-        
-        # Try to store the embedding
-        item_type = "debug_test"
-        item_id = f"test_{i+1:03d}"
-        success = embedding_service.store_embedding(item_type, item_id, text)
-        print(f"Storage result: {success}")
+    except Exception as e:
+        print(f"❌ Debug failed: {e}")
+        return False
 
-def check_stored_embeddings():
-    """Check what's actually stored in the database."""
-    print("\n\n=== Checking Stored Embeddings ===")
+def debug_multiple_texts():
+    """Debug embedding generation for multiple texts."""
+    test_texts = [
+        "Hello world",
+        "The quick brown fox jumps over the lazy dog",
+        "",
+        "Special chars: !@#$%^&*()",
+        "Very long text: " + "A" * 1000
+    ]
     
-    import sqlite3
-    conn = sqlite3.connect('assistant_demo.db')
-    cursor = conn.cursor()
+    print("Debugging multiple texts...")
+    print("=" * 50)
     
-    cursor.execute("SELECT item_type, item_id, vector_blob FROM embeddings WHERE item_type = 'debug_test'")
-    results = cursor.fetchall()
+    for i, text in enumerate(test_texts, 1):
+        print(f"\nTest {i}: '{text[:30]}{'...' if len(text) > 30 else ''}'")
+        success = debug_embedding_generation(text)
+        if not success:
+            return False
     
-    print(f"Found {len(results)} debug test embeddings:")
-    
-    for item_type, item_id, vector_blob in results:
-        embedding = json.loads(vector_blob)
-        non_zero_count = sum(1 for val in embedding if val != 0.0)
-        zero_percentage = (1 - non_zero_count / len(embedding)) * 100
-        
-        print(f"- {item_type} {item_id}: {non_zero_count}/{len(embedding)} non-zero values ({zero_percentage:.1f}% zero)")
-        
-        if non_zero_count > 0:
-            print(f"  First 5 values: {[round(val, 4) for val in embedding[:5]]}")
-        else:
-            print("  WARNING: All values are zero in database!")
-    
-    conn.close()
+    print("\n✓ All tests completed successfully")
+    return True
 
 if __name__ == "__main__":
-    debug_embedding_generation()
-    check_stored_embeddings()
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="Debug embedding generation")
+    parser.add_argument(
+        "--text",
+        default="Hello, this is a debug test!",
+        help="Text to generate embedding for"
+    )
+    parser.add_argument(
+        "--multi",
+        action="store_true",
+        help="Run multiple test cases"
+    )
+    
+    args = parser.parse_args()
+    
+    if args.multi:
+        debug_multiple_texts()
+    else:
+        debug_embedding_generation(args.text)

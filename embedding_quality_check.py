@@ -9,7 +9,7 @@ import sqlite3
 import json
 import numpy as np
 
-def check_embedding_quality(db_path: str = "assistant_demo.db"):
+def check_embedding_quality(db_path: str = "assistant_core.db"):
     """Check the quality of embeddings in the database."""
     print("Checking embedding quality...")
     

@@ -1,45 +1,117 @@
 #!/usr/bin/env python3
 """
-Script to inspect the embeddings in the database.
+Inspect Embeddings Utility
+
+This script inspects embeddings stored in the database.
 """
 
 import sqlite3
 import json
 
-def inspect_database():
-    """Inspect the contents of the embeddings table."""
-    print("Inspecting embeddings database...")
-    
-    conn = sqlite3.connect("assistant_demo.db")
-    cursor = conn.cursor()
-    
-    # Count total embeddings
-    cursor.execute("SELECT COUNT(*) FROM embeddings")
-    total_count = cursor.fetchone()[0]
-    print(f"Total embeddings: {total_count}")
-    
-    # Show embeddings by type
-    cursor.execute("SELECT item_type, COUNT(*) FROM embeddings GROUP BY item_type")
-    type_counts = cursor.fetchall()
-    print("Embeddings by type:")
-    for item_type, count in type_counts:
-        print(f"  {item_type}: {count}")
-    
-    # Show recent embeddings
-    cursor.execute("SELECT item_type, item_id, timestamp FROM embeddings ORDER BY timestamp DESC LIMIT 10")
-    recent_embeddings = cursor.fetchall()
-    print("\nRecent embeddings:")
-    for item_type, item_id, timestamp in recent_embeddings:
-        print(f"  {item_type} {item_id} ({timestamp})")
-    
-    # Show our test embeddings
-    cursor.execute("SELECT item_type, item_id FROM embeddings WHERE item_id LIKE 'comptest_%'")
-    test_embeddings = cursor.fetchall()
-    print("\nTest embeddings:")
-    for item_type, item_id in test_embeddings:
-        print(f"  {item_type} {item_id}")
-    
-    conn.close()
+def inspect_embeddings(db_path: str = "assistant_core.db", limit: int = 10):
+    """Inspect embeddings in the database."""
+    try:
+        print(f"Inspecting embeddings in {db_path}")
+        print("=" * 50)
+        
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        # Get embeddings
+        cursor.execute("""
+            SELECT trace_id, text, vector_json, created_at 
+            FROM embeddings 
+            ORDER BY created_at DESC 
+            LIMIT ?
+        """, (limit,))
+        
+        rows = cursor.fetchall()
+        
+        if not rows:
+            print("No embeddings found in database")
+            conn.close()
+            return True
+        
+        print(f"Found {len(rows)} embeddings:")
+        
+        for i, (trace_id, text, vector_json, created_at) in enumerate(rows, 1):
+            vector = json.loads(vector_json)
+            
+            print(f"\n{i}. Trace ID: {trace_id}")
+            print(f"   Text: {text[:60]}{'...' if len(text) > 60 else ''}")
+            print(f"   Dimensions: {len(vector)}")
+            print(f"   Created: {created_at}")
+            print(f"   Sample values: {vector[:5]}")
+        
+        conn.close()
+        return True
+        
+    except Exception as e:
+        print(f"Error inspecting embeddings: {e}")
+        return False
+
+def inspect_embedding_by_trace_id(trace_id: str, db_path: str = "assistant_core.db"):
+    """Inspect a specific embedding by trace ID."""
+    try:
+        print(f"Inspecting embedding with trace ID: {trace_id}")
+        print("=" * 50)
+        
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        # Get specific embedding
+        cursor.execute("""
+            SELECT trace_id, text, vector_json, created_at 
+            FROM embeddings 
+            WHERE trace_id = ?
+        """, (trace_id,))
+        
+        row = cursor.fetchone()
+        
+        if not row:
+            print(f"No embedding found with trace ID: {trace_id}")
+            conn.close()
+            return False
+        
+        trace_id, text, vector_json, created_at = row
+        vector = json.loads(vector_json)
+        
+        print(f"Trace ID: {trace_id}")
+        print(f"Text: {text}")
+        print(f"Dimensions: {len(vector)}")
+        print(f"Created: {created_at}")
+        print(f"All values: {vector}")
+        
+        conn.close()
+        return True
+        
+    except Exception as e:
+        print(f"Error inspecting embedding: {e}")
+        return False
 
 if __name__ == "__main__":
-    inspect_database()
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="Inspect embeddings in database")
+    parser.add_argument(
+        "--trace-id",
+        help="Inspect specific embedding by trace ID"
+    )
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=10,
+        help="Number of embeddings to show (default: 10)"
+    )
+    parser.add_argument(
+        "--db-path",
+        default="assistant_core.db",
+        help="Path to database file"
+    )
+    
+    args = parser.parse_args()
+    
+    if args.trace_id:
+        inspect_embedding_by_trace_id(args.trace_id, args.db_path)
+    else:
+        inspect_embeddings(args.db_path, args.limit)

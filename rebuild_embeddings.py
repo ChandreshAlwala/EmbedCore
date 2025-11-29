@@ -1,44 +1,39 @@
 #!/usr/bin/env python3
 """
-Rebuild Embeddings Script - Chandresh's reindexing utility
+Rebuild Embedding Index Script
 
-This script rebuilds the embedding index for all summaries and tasks in the database.
-Useful for:
-- Initial setup
-- Model changes
-- Data corruption recovery
-- Performance optimization
+This script rebuilds the embedding index for all items in the database.
+It can be used to regenerate embeddings when the model or algorithm changes.
 """
 
-import argparse
 import sqlite3
+import argparse
 import sys
-from datetime import datetime
-from embedding_service import EmbeddingService
 import logging
+from typing import List, Optional
+
+from embedding_service import EmbeddingService
 
 # Set up logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-def clear_existing_embeddings(db_path: str, item_type: str = None):
-    """Clear existing embeddings from database."""
+def clear_existing_embeddings(db_path: str, item_type: str):
+    """Clear existing embeddings for a specific item type."""
     try:
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         
-        if item_type:
-            cursor.execute('DELETE FROM embeddings WHERE item_type = ?', (item_type,))
-            logger.info(f"Cleared embeddings for item_type: {item_type}")
-        else:
-            cursor.execute('DELETE FROM embeddings')
-            logger.info("Cleared all embeddings")
+        cursor.execute(
+            "DELETE FROM embeddings WHERE item_type = ?", 
+            (item_type,)
+        )
         
+        deleted_count = cursor.rowcount
         conn.commit()
         conn.close()
+        
+        logger.info(f"Cleared {deleted_count} existing {item_type} embeddings")
         
     except Exception as e:
         logger.error(f"Error clearing embeddings: {e}")
@@ -51,13 +46,13 @@ def get_items_to_index(db_path: str, item_type: str):
         cursor = conn.cursor()
         
         if item_type == 'summary':
-            cursor.execute('SELECT summary_id, summary_text FROM summaries')
+            cursor.execute("SELECT summary_id, summary_text FROM summaries WHERE summary_text IS NOT NULL")
         elif item_type == 'task':
-            cursor.execute('SELECT task_id, task_text FROM tasks')
+            cursor.execute("SELECT task_id, task_text FROM tasks WHERE task_text IS NOT NULL")
         elif item_type == 'response':
-            cursor.execute('SELECT response_id, response_text FROM responses')
+            cursor.execute("SELECT response_id, response_text FROM responses WHERE response_text IS NOT NULL")
         else:
-            raise ValueError(f"Unsupported item_type: {item_type}")
+            raise ValueError(f"Unknown item type: {item_type}")
         
         items = cursor.fetchall()
         conn.close()
@@ -68,8 +63,8 @@ def get_items_to_index(db_path: str, item_type: str):
         logger.error(f"Error getting items to index: {e}")
         raise
 
-def rebuild_embeddings(db_path: str = "assistant_demo.db", 
-                      item_types: list = None, 
+def rebuild_embeddings(db_path: str = "assistant_core.db", 
+                      item_types: Optional[List[str]] = None, 
                       clear_first: bool = False,
                       model_name: str = "all-MiniLM-L6-v2"):
     """
@@ -139,7 +134,7 @@ def rebuild_embeddings(db_path: str = "assistant_demo.db",
     
     return total_processed, total_errors
 
-def verify_embeddings(db_path: str = "assistant_demo.db"):
+def verify_embeddings(db_path: str = "assistant_core.db"):
     """Verify the integrity of stored embeddings."""
     try:
         conn = sqlite3.connect(db_path)
@@ -173,8 +168,8 @@ def main():
     
     parser.add_argument(
         "--db-path", 
-        default="assistant_demo.db",
-        help="Path to SQLite database (default: assistant_demo.db)"
+        default="assistant_core.db",
+        help="Path to SQLite database (default: assistant_core.db)"
     )
     
     parser.add_argument(

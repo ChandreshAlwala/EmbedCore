@@ -15,7 +15,12 @@ import random
 import logging
 import os
 from typing import List, Union
+from datetime import datetime
+import uuid
 
+# Import required modules
+from keystore import KeyStore
+from embed_logger import log_embedding
 
 # Configure logging with environment variable control
 # Set EMBEDCORE_LOG_LEVEL environment variable to control logging level
@@ -184,6 +189,100 @@ def deobfuscate(obf_embedding: List[float], user_key: str) -> List[float]:
         return original_embedding
     except Exception as e:
         logger.error(f"Error de-obfuscating embedding: {e}")
+        raise
+
+
+def secure_embed(message: str, user_id: str, platform: str) -> dict:
+    """
+    Generate a secure embedding with full pipeline processing and logging.
+    
+    This function orchestrates the complete secure embedding pipeline:
+    1. Validates inputs
+    2. Fetches or generates user key
+    3. Generates deterministic embedding
+    4. Obfuscates the embedding
+    5. Logs the embedding
+    6. Returns structured result
+    
+    Args:
+        message (str): The text message to process
+        user_id (str): Unique identifier for the user
+        platform (str): Platform identifier
+        
+    Returns:
+        dict: JSON dictionary containing:
+            - embedding: Obfuscated embedding vector
+            - user_id: User identifier
+            - platform: Platform identifier
+            - timestamp: ISO 8601 formatted timestamp
+            
+    Raises:
+        TypeError: If inputs are not of expected types
+        ValueError: If required fields are empty
+        Exception: For any other processing errors
+    """
+    # Input validation
+    if not isinstance(message, str):
+        raise TypeError("message must be a string")
+    if not isinstance(user_id, str):
+        raise TypeError("user_id must be a string")
+    if not isinstance(platform, str):
+        raise TypeError("platform must be a string")
+    if not user_id:
+        raise ValueError("user_id cannot be empty")
+    if not platform:
+        raise ValueError("platform cannot be empty")
+        
+    try:
+        logger.info(f"Processing secure embedding for user {user_id} on platform {platform}")
+        
+        # Fetch the user key using get_key(user_id), and if missing, generate it using generate_key(user_id)
+        keystore = KeyStore()
+        user_key_bytes = keystore.get_key(user_id)
+        
+        # If no key exists, generate one
+        if user_key_bytes is None:
+            logger.info(f"No existing key found for user {user_id}, generating new key")
+            user_key_bytes = keystore.generate_key(user_id)
+        
+        # Decode key for use in obfuscation
+        user_key = user_key_bytes.decode()
+        logger.debug("Retrieved user key for obfuscation")
+        
+        # Generate the embedding using generate_embedding(message)
+        embedding = generate_embedding(message)
+        logger.debug(f"Generated embedding with {len(embedding)} dimensions")
+        
+        # Obfuscate it using obfuscate(embedding, key)
+        obf_embedding = obfuscate(embedding, user_key)
+        logger.debug("Obfuscated embedding with user key")
+        
+        # Create an ISO timestamp using datetime.utcnow().isoformat()
+        timestamp = datetime.utcnow().isoformat()
+        
+        # Generate session_id (auto-generated UUID)
+        session_id = str(uuid.uuid4())
+        
+        # Log the embedding by calling log_embedding() from embed_logger with user_id, session_id, platform, obfuscated embedding
+        log_result = log_embedding(user_id, session_id, platform, obf_embedding)
+        if log_result['overall_success']:
+            logger.info(f"Successfully logged embedding for user {user_id}")
+        else:
+            logger.warning(f"Failed to log embedding for user {user_id}")
+        
+        # Return a JSON dictionary exactly in this format
+        result = {
+            "embedding": obf_embedding,
+            "user_id": user_id,
+            "platform": platform,
+            "timestamp": timestamp
+        }
+        
+        logger.info(f"Secure embedding processing completed for user {user_id}")
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error in secure_embed for user {user_id}: {e}")
         raise
 
 

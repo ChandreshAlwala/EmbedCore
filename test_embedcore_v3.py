@@ -86,6 +86,66 @@ def test_full_roundtrip():
             f"Roundtrip mismatch at index {i}"
 
 
+def test_same_input_same_output():
+    """
+    Test that same input produces same output.
+    
+    Same message + same key → same embedding
+    Same embedding + same key → same obfuscation
+    """
+    # Test message
+    message = "Consistency test message"
+    user_key = "consistency-key"
+    
+    # Generate embedding twice with same input
+    embedding1 = generate_embedding(message)
+    embedding2 = generate_embedding(message)
+    
+    # They should be identical
+    assert embedding1 == embedding2, "Same input should produce same embedding"
+    
+    # Obfuscate twice with same input
+    obf_embedding1 = obfuscate(embedding1, user_key)
+    obf_embedding2 = obfuscate(embedding2, user_key)
+    
+    # They should be identical
+    assert obf_embedding1 == obf_embedding2, "Same embedding + same key should produce same obfuscation"
+    
+    print("✓ test_same_input_same_output passed")
+
+
+def test_same_message_diff_keys():
+    """
+    Test that same message with different keys produces different obfuscated embeddings.
+    
+    Same message + different keys → different obfuscated embeddings
+    """
+    # Test message
+    message = "Different keys test message"
+    key1 = "key-one"
+    key2 = "key-two"
+    
+    # Generate embedding
+    embedding = generate_embedding(message)
+    
+    # Obfuscate with different keys
+    obf_embedding1 = obfuscate(embedding, key1)
+    obf_embedding2 = obfuscate(embedding, key2)
+    
+    # They should be different
+    # Using a small tolerance to account for potential floating point issues
+    tolerance = 1e-10
+    embeddings_are_different = False
+    for i in range(len(obf_embedding1)):
+        if abs(obf_embedding1[i] - obf_embedding2[i]) > tolerance:
+            embeddings_are_different = True
+            break
+    
+    assert embeddings_are_different, "Different keys should produce different obfuscated embeddings"
+    
+    print("✓ test_same_message_diff_keys passed")
+
+
 if __name__ == "__main__":
     # Run the tests
     try:
@@ -97,6 +157,12 @@ if __name__ == "__main__":
         
         test_full_roundtrip()
         print("✓ test_full_roundtrip passed")
+        
+        test_same_input_same_output()
+        print("✓ test_same_input_same_output passed")
+        
+        test_same_message_diff_keys()
+        print("✓ test_same_message_diff_keys passed")
         
         print("All tests passed!")
     except Exception as e:

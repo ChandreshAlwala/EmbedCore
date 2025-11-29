@@ -1,120 +1,178 @@
-import sys
-import os
-sys.path.append(os.path.join(os.path.dirname(__file__)))
+#!/usr/bin/env python3
+"""
+Comprehensive Embedding Test Suite
 
-from embedding_service import embedding_service
-import json
+This script runs a comprehensive set of tests on the embedding generation and storage system.
+"""
+
 import sqlite3
+import json
+import numpy as np
+from datetime import datetime
+from embedcore_v3 import generate_embedding, obfuscate, deobfuscate
+from keystore import KeyStore
 
-def comprehensive_embedding_test():
-    """Comprehensive test of embedding generation, storage, and retrieval."""
-    print("=== Comprehensive Embedding Test ===")
+def test_embedding_consistency():
+    """Test that the same input always produces the same embedding."""
+    print("Testing embedding consistency...")
     
-    # Extended test data with more diverse samples
-    test_cases = [
-        # Original test cases
-        ("summary", "summary_001", "This is the first test summary for our application"),
-        ("task", "task_001", "Create a new feature for user authentication"),
-        ("response", "response_001", "I have completed the user authentication feature"),
-        ("summary", "summary_002", "Machine learning models require quality training data"),
-        ("task", "task_002", "Implement data preprocessing pipeline for ML models"),
-        
-        # Additional diverse samples for better training
-        ("summary", "summary_003", "The system performance has improved significantly after the recent optimization"),
-        ("summary", "summary_004", "Customer feedback indicates high satisfaction with the new interface design"),
-        ("summary", "summary_005", "Database queries are taking longer than expected during peak hours"),
-        ("summary", "summary_006", "The new API endpoints are functioning correctly with all test cases passing"),
-        ("summary", "summary_007", "Security audit revealed several vulnerabilities that need immediate attention"),
-        ("summary", "summary_008", "The deployment process completed successfully with zero downtime"),
-        ("summary", "summary_009", "User engagement metrics show a 25% increase after the feature release"),
-        ("summary", "summary_010", "Integration with third-party services is experiencing intermittent connection issues"),
-        
-        ("task", "task_003", "Optimize database queries for better performance during peak usage"),
-        ("task", "task_004", "Design and implement user feedback collection mechanism"),
-        ("task", "task_005", "Fix security vulnerabilities identified in the recent audit report"),
-        ("task", "task_006", "Create automated deployment scripts for zero-downtime updates"),
-        ("task", "task_007", "Analyze user engagement data to identify improvement opportunities"),
-        ("task", "task_008", "Implement retry mechanism for third-party service connections"),
-        ("task", "task_009", "Develop comprehensive API documentation for all endpoints"),
-        ("task", "task_010", "Set up monitoring and alerting for system performance metrics"),
-        
-        ("response", "response_002", "Performance optimization completed, response times reduced by 40%"),
-        ("response", "response_003", "Feedback collection form has been implemented and deployed"),
-        ("response", "response_004", "All critical security vulnerabilities have been patched and tested"),
-        ("response", "response_005", "Deployment scripts are ready for production use"),
-        ("response", "response_006", "User engagement analysis report has been generated and shared"),
-        ("response", "response_007", "Connection retry mechanism is now handling failures gracefully"),
-        ("response", "response_008", "API documentation is available at the standard documentation endpoint"),
-        ("response", "response_009", "Monitoring system is active and sending alerts as configured"),
-        ("response", "response_010", "The issue has been resolved and system is back to normal operation"),
-        
-        # Additional domain-specific samples
-        ("summary", "summary_011", "Natural language processing model achieved 92% accuracy on validation set"),
-        ("task", "task_011", "Fine-tune the NLP model with additional domain-specific training data"),
-        ("response", "response_011", "Model fine-tuning completed with improved performance on specialized tasks"),
-        
-        ("summary", "summary_012", "Cloud infrastructure costs increased by 15% this quarter"),
-        ("task", "task_012", "Optimize cloud resource allocation to reduce infrastructure costs"),
-        ("response", "response_012", "Resource optimization implemented, projected cost reduction of 20%"),
-    ]
+    text = "This is a test sentence for consistency checking."
     
-    # Store embeddings
-    print("\n1. Storing embeddings...")
-    for item_type, item_id, text in test_cases:
-        success = embedding_service.store_embedding(item_type, item_id, text)
-        print(f"  {item_type} {item_id}: {'✓' if success else '✗'}")
+    # Generate embedding multiple times
+    embedding1 = generate_embedding(text)
+    embedding2 = generate_embedding(text)
+    embedding3 = generate_embedding(text)
     
-    # Retrieve and verify embeddings
-    print("\n2. Verifying stored embeddings...")
-    conn = sqlite3.connect('assistant_demo.db')
+    # Check that all embeddings are identical
+    assert embedding1 == embedding2 == embedding3, "Embeddings should be identical"
+    print("✓ Embedding consistency test passed")
+
+def test_obfuscation_reversibility():
+    """Test that obfuscation is reversible."""
+    print("Testing obfuscation reversibility...")
+    
+    original = [0.1, -0.2, 0.3, -0.4, 0.5]
+    key = "test_key_123"
+    
+    # Obfuscate and then deobfuscate
+    obfuscated = obfuscate(original, key)
+    deobfuscated = deobfuscate(obfuscated, key)
+    
+    # Check that deobfuscated matches original (within floating point tolerance)
+    assert len(deobfuscated) == len(original), "Length should match"
+    for i in range(len(original)):
+        assert abs(deobfuscated[i] - original[i]) < 1e-10, f"Value at index {i} should match"
+    
+    print("✓ Obfuscation reversibility test passed")
+
+def test_key_isolation():
+    """Test that different keys produce different obfuscations."""
+    print("Testing key isolation...")
+    
+    original = [0.1, -0.2, 0.3, -0.4, 0.5]
+    key1 = "test_key_alpha"
+    key2 = "test_key_beta"
+    
+    # Obfuscate with different keys
+    obfuscated1 = obfuscate(original, key1)
+    obfuscated2 = obfuscate(original, key2)
+    
+    # Check that obfuscated values are different
+    assert obfuscated1 != obfuscated2, "Different keys should produce different obfuscations"
+    print("✓ Key isolation test passed")
+
+def test_database_storage():
+    """Test that embeddings can be stored and retrieved from database."""
+    print("Testing database storage...")
+    
+    # Initialize key store
+    keystore = KeyStore()
+    user_id = "test_user_123"
+    
+    # Generate a key for the user
+    user_key = keystore.generate_key(user_id)
+    
+    # Generate embedding
+    text = "Test text for database storage"
+    embedding = generate_embedding(text)
+    
+    # Obfuscate embedding
+    obfuscated = obfuscate(embedding, user_key.decode())
+    
+    # Store in database
+    db_path = "assistant_core.db"
+    conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     
-    cursor.execute("SELECT item_type, item_id, vector_blob, text_content FROM embeddings")
-    results = cursor.fetchall()
+    # Create table if it doesn't exist
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS embeddings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            trace_id TEXT NOT NULL UNIQUE,
+            text TEXT NOT NULL,
+            vector_json TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )
+    ''')
     
-    print(f"Found {len(results)} total embeddings in database:")
+    # Insert data
+    trace_id = f"test_{datetime.now().strftime('%Y%m%d%H%M%S%f')}"
+    vector_json = json.dumps(obfuscated)
+    created_at = datetime.now().isoformat()
     
-    for item_type, item_id, vector_blob, text_content in results:
-        # Parse the embedding
-        embedding = json.loads(vector_blob)
-        
-        # Count non-zero values
-        non_zero_count = sum(1 for val in embedding if val != 0.0)
-        zero_percentage = (1 - non_zero_count / len(embedding)) * 100
-        
-        print(f"  {item_type} {item_id}: {non_zero_count}/{len(embedding)} non-zero ({zero_percentage:.1f}% zero)")
-        
-        # Verify text content matches
-        if text_content and len(text_content) > 50:
-            text_display = text_content[:47] + "..."
-        else:
-            text_display = text_content or "None"
-            
-        print(f"    Text: {text_display}")
-        
-        # Check if embedding is valid
-        if non_zero_count > 0:
-            print(f"    Status: ✓ Valid embedding")
-        else:
-            print(f"    Status: ✗ Invalid embedding (all zeros)")
+    cursor.execute('''
+        INSERT INTO embeddings (trace_id, text, vector_json, created_at)
+        VALUES (?, ?, ?, ?)
+    ''', (trace_id, text, vector_json, created_at))
     
+    conn.commit()
     conn.close()
     
-    # Test similarity search
-    print("\n3. Testing similarity search...")
-    try:
-        results = embedding_service.search_similar_items(
-            query_text="user authentication feature", 
-            top_k=3
-        )
-        
-        print(f"Found {len(results)} similar items:")
-        for item in results:
-            print(f"  {item['item_type']} {item['item_id']}: {item['score']:.4f}")
-    except Exception as e:
-        print(f"Similarity search failed: {e}")
+    # Retrieve from database
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
     
-    print("\n=== Test Complete ===")
+    cursor.execute("SELECT vector_json FROM embeddings WHERE trace_id = ?", (trace_id,))
+    row = cursor.fetchone()
+    
+    assert row is not None, "Should find the stored embedding"
+    
+    retrieved_obfuscated_json = row[0]
+    retrieved_obfuscated = json.loads(retrieved_obfuscated_json)
+    
+    # Deobfuscate
+    retrieved_deobfuscated = deobfuscate(retrieved_obfuscated, user_key.decode())
+    
+    # Check that retrieved embedding matches original (within floating point tolerance)
+    assert len(retrieved_deobfuscated) == len(embedding), "Length should match"
+    for i in range(len(embedding)):
+        assert abs(retrieved_deobfuscated[i] - embedding[i]) < 1e-10, f"Value at index {i} should match"
+    
+    conn.close()
+    print("✓ Database storage test passed")
+
+def test_edge_cases():
+    """Test edge cases."""
+    print("Testing edge cases...")
+    
+    # Empty string
+    empty_embedding = generate_embedding("")
+    assert isinstance(empty_embedding, list), "Should return a list"
+    assert len(empty_embedding) > 0, "Should have elements"
+    
+    # Very long string
+    long_text = "A" * 10000
+    long_embedding = generate_embedding(long_text)
+    assert isinstance(long_embedding, list), "Should return a list"
+    
+    # Special characters
+    special_text = "Test with special chars: !@#$%^&*()_+-=[]{}|;':\",./<>?"
+    special_embedding = generate_embedding(special_text)
+    assert isinstance(special_embedding, list), "Should return a list"
+    
+    print("✓ Edge cases test passed")
+
+def run_all_tests():
+    """Run all tests."""
+    print("Running comprehensive embedding test suite...")
+    print("=" * 50)
+    
+    try:
+        test_embedding_consistency()
+        test_obfuscation_reversibility()
+        test_key_isolation()
+        test_database_storage()
+        test_edge_cases()
+        
+        print("=" * 50)
+        print("All tests passed! 🎉")
+        return True
+        
+    except Exception as e:
+        print(f"Test failed: {e}")
+        return False
 
 if __name__ == "__main__":
-    comprehensive_embedding_test()
+    success = run_all_tests()
+    if not success:
+        exit(1)
